@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Knowledge Engineering</title><link rel="stylesheet" href="/static/styles.css"></head>
+<body>
+<header><div><span class="eyebrow">COPILOT STUDIO · DOCUMENT AI</span><h1>Knowledge Engineering</h1><p>Documentos confiáveis, rastreáveis e prontos para agentes.</p></div><div class="health" id="health">verificando...</div></header>
+<main>
+<section class="panel upload"><div><h2>Nova ingestão</h2><p>PDF, TXT ou Markdown · limite configurável</p></div><form id="upload"><input id="file" type="file" accept=".pdf,.txt,.md" required><button>Processar documento</button></form><div id="message"></div></section>
+<section><div class="section-head"><div><span class="eyebrow">CATÁLOGO</span><h2>Documentos curados</h2></div><button class="secondary" onclick="loadDocuments()">Atualizar</button></div><div id="documents" class="grid"></div></section>
+</main>
+<template id="card"><article class="card"><div class="card-top"><span class="status"></span><span class="score"></span></div><h3></h3><p class="meta"></p><div class="bar"><i></i></div><p class="detail"></p><div class="actions"></div><details><summary>Ver Markdown</summary><pre></pre></details></article></template>
+<script src="/static/app.js"></script>
+</body></html>

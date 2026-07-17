@@ -1,0 +1,11 @@
+ingestion:
+  allowed_extensions: [.pdf, .txt, .md]
+  max_upload_mb: 25
+inspection:
+  ocr_text_coverage_threshold: 0.70
+quality_gates:
+  minimum_score: 0.75
+  require_source_hash: true
+  require_human_review: true
+publishing:
+  accepted_status: approved

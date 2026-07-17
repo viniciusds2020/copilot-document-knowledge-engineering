@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "copilot-document-knowledge-engineering"
+version = "0.1.0"
+description = "Governed document-to-knowledge pipeline for Copilot Studio"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn[standard]>=0.30,<1",
+  "pydantic-settings>=2.5,<3",
+  "python-multipart>=0.0.12,<1",
+  "PyMuPDF>=1.24,<2",
+]
+
+[project.optional-dependencies]
+document = ["docling>=2.15,<3", "ocrmypdf>=16.6,<18"]
+dev = ["httpx>=0.27,<1", "pytest>=8,<9", "pytest-cov>=5,<7", "ruff>=0.8,<1"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+knowledge_engineering = ["static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --cov=knowledge_engineering --cov-report=term-missing"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = ["repo-audit", "tmpcheck", "tmpnlp", "tmprepo"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+ignore = ["B008"]
