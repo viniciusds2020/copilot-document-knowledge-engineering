@@ -55,6 +55,26 @@ def docling_markdown(path: Path) -> str:
     return DocumentConverter().convert(path).document.export_to_markdown()
 
 
+def apply_ocr(path: Path) -> Path:
+    try:
+        import ocrmypdf
+    except ImportError as exc:
+        raise PipelineError("Instale o extra 'document' para usar OCRmyPDF.") from exc
+    output = path.with_name(f"{path.stem}-ocr.pdf")
+    try:
+        ocrmypdf.ocr(
+            path,
+            output,
+            language=["por"],
+            rotate_pages=True,
+            deskew=True,
+            skip_text=True,
+        )
+    except Exception as exc:
+        raise PipelineError(f"Falha no OCR: {exc}") from exc
+    return output
+
+
 def add_front_matter(title: str, sha256: str, markdown: str, needs_ocr: bool) -> str:
     safe_title = re.sub(r"[\r\n]+", " ", title).strip()
     return (
@@ -81,9 +101,11 @@ def process(filename: str, content: bytes, config: Settings) -> Document:
     upload_dir.mkdir(parents=True, exist_ok=True)
     path = upload_dir / f"{document_id}{Path(filename).suffix.lower()}"
     path.write_bytes(content)
-    markdown = docling_markdown(path) if config.converter == "docling" else fallback_markdown(
-        filename, content
-    )
+    if config.converter == "docling":
+        conversion_path = apply_ocr(path) if metrics["needs_ocr"] else path
+        markdown = docling_markdown(conversion_path)
+    else:
+        markdown = fallback_markdown(filename, content)
     curated = add_front_matter(title, digest, markdown, metrics["needs_ocr"])
     nonempty = len(markdown.strip()) >= 40
     score = round(0.45 * metrics["coverage"] + 0.35 * float(nonempty) + 0.20, 3)
@@ -101,3 +123,4 @@ def process(filename: str, content: bytes, config: Settings) -> Document:
         quality_passed=score >= config.min_quality_score,
         created_at=datetime.now(UTC).isoformat(),
     )
+
