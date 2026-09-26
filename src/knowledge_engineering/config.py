@@ -15,6 +15,13 @@ class Settings(BaseSettings):
     groq_model: str = "llama-3.3-70b-versatile"
     groq_timeout_seconds: int = 60
     max_source_chars_per_document: int = 20_000
+    vision_ocr_api_key: str = ""
+    vision_ocr_base_url: str = "https://api.groq.com/openai/v1"
+    vision_ocr_model: str = ""
+    vision_ocr_timeout_seconds: int = 90
+    vision_ocr_max_tokens: int = 4096
+    vision_ocr_max_pages: int = 25
+    vision_ocr_dpi: int = 180
 
     @property
     def database_path(self) -> Path:
