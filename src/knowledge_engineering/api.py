@@ -6,12 +6,14 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import settings
+from .curation import create_knowledge_pack
 from .database import Repository
-from .models import StatusUpdate
+from .groq_client import GroqClient, GroqError
+from .models import KnowledgePackRequest, StatusUpdate
 from .pipeline import PipelineError, process
 
 STATIC = Path(__file__).parent / "static"
-app = FastAPI(title="Copilot Document Knowledge Engineering", version="0.1.0")
+app = FastAPI(title="Copilot Document Knowledge Engineering", version="0.2.0")
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 repository = Repository(settings.database_path)
 
@@ -23,7 +25,11 @@ def home():
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "converter": settings.converter}
+    return {
+        "status": "ok",
+        "converter": settings.converter,
+        "groq_configured": bool(settings.groq_api_key),
+    }
 
 
 @app.get("/api/documents")
@@ -69,3 +75,49 @@ def update_status(document_id: str, update: StatusUpdate):
     document.status = update.status
     repository.update(document)
     return document
+
+
+@app.get("/api/knowledge-packs")
+def list_knowledge_packs():
+    return repository.list_packs()
+
+
+@app.get("/api/knowledge-packs/{pack_id}")
+def get_knowledge_pack(pack_id: str):
+    pack = repository.get_pack(pack_id)
+    if not pack:
+        raise HTTPException(404, "Pacote de conhecimento não encontrado.")
+    return pack
+
+
+@app.post("/api/knowledge-packs", status_code=201)
+def create_pack(request: KnowledgePackRequest):
+    documents = []
+    missing = []
+    for document_id in request.document_ids:
+        document = repository.get(document_id)
+        if document:
+            documents.append(document)
+        else:
+            missing.append(document_id)
+    if missing:
+        raise HTTPException(404, "Documentos não encontrados: " + ", ".join(missing))
+    try:
+        client = GroqClient(
+            settings.groq_api_key, settings.groq_model, settings.groq_timeout_seconds
+        )
+        pack = create_knowledge_pack(
+            documents,
+            request.domain,
+            request.version,
+            client,
+            settings.max_source_chars_per_document,
+        )
+        repository.save_pack(pack)
+        return pack
+    except (GroqError, ValueError) as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except sqlite3.IntegrityError as exc:
+        raise HTTPException(
+            409, "Já existe um pacote com este domínio e versão."
+        ) from exc
