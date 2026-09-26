@@ -114,27 +114,41 @@ def create_knowledge_pack(
     if rejected:
         raise ValueError("Only approved documents can be consolidated: " + ", ".join(rejected))
 
-    extracted = [extract_document_knowledge(document, client, max_source_chars) for document in documents]
+    extracted = [
+        extract_document_knowledge(document, client, max_source_chars)
+        for document in documents
+    ]
     candidate_items = [item.model_dump() for _, items, _ in extracted for item in items]
     source_summaries = [
         {"title": document.title, "sha256": document.sha256, "summary": summary}
         for document, (summary, _, _) in zip(documents, extracted, strict=True)
     ]
-    payload = client.complete_json(
-        system=SYSTEM_PROMPT,
-        user=f"""Consolidate the approved document summaries and atomic facts below into one knowledge base.
-Merge only semantically identical items. Do not resolve contradictions: list them in conflicts_or_gaps.
-Every output knowledge item must retain source_document_id, source_document, source_sha256 and source_page exactly as one of its inputs.
+    consolidation_request = f"""Consolidate the approved document summaries and atomic facts
+below into one knowledge base. Merge only semantically identical items.
+Do not resolve contradictions. List them in conflicts_or_gaps.
+Every output knowledge item must retain source_document_id, source_document,
+source_sha256 and source_page exactly as one of its inputs.
 Return exactly this JSON shape:
 {{
   "summary": "executive summary",
-  "knowledge_items": [{{"topic": "...", "statement": "...", "kind": "...", "exceptions": [], "source_document_id": "...", "source_document": "...", "source_sha256": "...", "source_page": 1}}],
+  "knowledge_items": [
+    {{
+      "topic": "...",
+      "statement": "...",
+      "kind": "...",
+      "exceptions": [],
+      "source_document_id": "...",
+      "source_document": "...",
+      "source_sha256": "...",
+      "source_page": 1
+    }}
+  ],
   "conflicts_or_gaps": ["..."]
 }}
 Domain: {domain}
 Document summaries: {json.dumps(source_summaries, ensure_ascii=False)}
-Candidate facts: {json.dumps(candidate_items, ensure_ascii=False)}""",
-    )
+Candidate facts: {json.dumps(candidate_items, ensure_ascii=False)}"""
+    payload = client.complete_json(system=SYSTEM_PROMPT, user=consolidation_request)
 
     items = [KnowledgeItem.model_validate(item) for item in payload.get("knowledge_items", [])]
     warnings = [warning for _, _, values in extracted for warning in values]
