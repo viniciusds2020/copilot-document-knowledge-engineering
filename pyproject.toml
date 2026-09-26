@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "copilot-document-knowledge-engineering"
-version = "0.2.0"
+version = "0.3.0"
 description = "Governed document-to-knowledge pipeline for Copilot Studio"
 requires-python = ">=3.11"
 dependencies = [

@@ -4,12 +4,13 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-Pipeline governado para transformar documentos corporativos em conhecimento rastreável para agentes do Microsoft Copilot Studio. A versão 0.2 inclui a curadoria e consolidação semântica via Groq, mantendo cada regra vinculada ao documento, hash e página de evidência.
+Pipeline governado para transformar documentos corporativos em conhecimento rastreável para agentes do Microsoft Copilot Studio. A versão 0.3 inclui OCR por visão com modelos multimodais, além da curadoria e consolidação semântica via Groq, mantendo cada regra vinculada ao documento, hash e página de evidência.
 
 ## O que a solução entrega
 
 - inspeção de PDFs e decisão automática de OCR por cobertura de texto;
-- OCR opcional com OCRmyPDF e conversão estruturada com Docling;
+- OCR opcional com OCRmyPDF ou OCR por visão com modelos multimodais;
+- conversão estruturada com Docling quando configurada;
 - fallback leve com PyMuPDF para desenvolvimento e testes;
 - Markdown com metadados, hash, origem e marcadores de página;
 - workflow `draft → review → approved/deprecated`;
@@ -23,11 +24,12 @@ Pipeline governado para transformar documentos corporativos em conhecimento rast
 ```mermaid
 flowchart TD
     A[Documentos brutos] --> B[OCR e Markdown rastreável]
-    B --> C[Extração atômica via Groq]
-    C --> D[Consolidação por domínio]
-    D --> E[Revisão humana]
-    E --> F[Base aprovada no SharePoint]
-    E --> G[JSON para vetorização]
+    B --> C[OCR visual opcional]
+    C --> D[Extração atômica via Groq]
+    D --> E[Consolidação por domínio]
+    E --> F[Revisão humana]
+    F --> G[Base aprovada no SharePoint]
+    F --> H[JSON para vetorização]
 ```
 
 O LLM não substitui a fonte oficial: cada item consolidado preserva o identificador do documento, título, hash e página de evidência. Documentos ainda não aprovados não podem entrar em um pacote.
@@ -42,14 +44,28 @@ cp .env.example .env
 uvicorn knowledge_engineering.api:app --reload
 ```
 
-O modo padrão `fallback` funciona sem Docling, Tesseract ou Ghostscript. Para o pipeline completo:
+O modo padrão `fallback` funciona sem Docling, Tesseract ou Ghostscript. Para OCR clássico + Docling:
 
 ```bash
 pip install -e ".[document,dev]"
 export KE_CONVERTER=docling
 ```
 
-O OCRmyPDF também requer Tesseract e Ghostscript no sistema. Em Docker, essas dependências já são instaladas:
+O OCRmyPDF também requer Tesseract e Ghostscript no sistema.
+
+Para OCR por visão, use um modelo multimodal compatível com endpoint OpenAI-style:
+
+```bash
+export KE_CONVERTER=vision-ocr
+export KE_VISION_OCR_API_KEY="sua-chave"   # se vazio, usa KE_GROQ_API_KEY
+export KE_VISION_OCR_BASE_URL="https://api.groq.com/openai/v1"
+export KE_VISION_OCR_MODEL="seu-modelo-de-visao-ou-ocr"
+export KE_VISION_OCR_MAX_PAGES=25
+```
+
+Esse modo renderiza cada página do PDF como PNG, envia para o modelo e grava Markdown com `source_page`. Ele é útil para documentos escaneados, tabelas difíceis, carimbos e layouts em que OCR tradicional perde contexto. O prompt força transcrição fiel, sem resumo ou inferência.
+
+Em Docker, as dependências do OCR clássico já são instaladas:
 
 ```bash
 docker compose up --build
@@ -76,7 +92,7 @@ O projeto envia apenas o Markdown de documentos aprovados e limita cada fonte a 
 | `POST` | `/api/knowledge-packs` | Consolida documentos aprovados usando Groq |
 | `GET` | `/api/knowledge-packs` | Lista pacotes consolidados |
 | `GET` | `/api/knowledge-packs/{id}` | Retorna Markdown e JSON rastreáveis |
-| `GET` | `/api/health` | Saúde, conversor e configuração Groq |
+| `GET` | `/api/health` | Saúde, conversor e configuração Groq/OCR visual |
 
 Exemplo de criação de pacote:
 
@@ -113,11 +129,13 @@ Assim o chatbot responde rapidamente com conhecimento curado e ainda recupera a 
 - documentos duplicados são detectados por SHA-256;
 - aprovação exige quality gate aprovado;
 - pacotes só aceitam documentos aprovados;
+- OCR visual preserva páginas, mas deve passar por revisão humana antes de virar base oficial;
 - instruções proíbem invenção de fontes e vazamento de conteúdo;
 - arquivos em `data/` são ignorados pelo Git e devem usar armazenamento seguro em produção.
 
 ## Roadmap
 
+- suporte a DeepSeek OCR ou provedores dedicados com adaptadores nativos quando necessário;
 - publicação automatizada no SharePoint via Graph API ou Power Automate;
 - processamento em lote e atualização incremental por domínio;
 - extração de versão, vigência, confidencialidade e proprietário;

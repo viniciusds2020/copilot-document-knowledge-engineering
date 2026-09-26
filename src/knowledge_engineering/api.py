@@ -13,7 +13,7 @@ from .models import KnowledgePackRequest, StatusUpdate
 from .pipeline import PipelineError, process
 
 STATIC = Path(__file__).parent / "static"
-app = FastAPI(title="Copilot Document Knowledge Engineering", version="0.2.0")
+app = FastAPI(title="Copilot Document Knowledge Engineering", version="0.3.0")
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 repository = Repository(settings.database_path)
 
@@ -29,6 +29,9 @@ def health():
         "status": "ok",
         "converter": settings.converter,
         "groq_configured": bool(settings.groq_api_key),
+        "vision_ocr_configured": bool(
+            (settings.vision_ocr_api_key or settings.groq_api_key) and settings.vision_ocr_model
+        ),
     }
 
 

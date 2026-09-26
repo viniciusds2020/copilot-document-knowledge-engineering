@@ -8,6 +8,7 @@ import fitz
 
 from .config import Settings
 from .models import Document
+from .vision_ocr import VisionOcrClient, build_vision_ocr_client, vision_ocr_markdown
 
 ALLOWED_SUFFIXES = {".pdf", ".txt", ".md"}
 
@@ -88,7 +89,12 @@ def add_front_matter(title: str, sha256: str, markdown: str, needs_ocr: bool) ->
     )
 
 
-def process(filename: str, content: bytes, config: Settings) -> Document:
+def process(
+    filename: str,
+    content: bytes,
+    config: Settings,
+    vision_ocr_client: VisionOcrClient | None = None,
+) -> Document:
     if not content:
         raise PipelineError("Arquivo vazio.")
     if len(content) > config.max_upload_mb * 1024 * 1024:
@@ -101,14 +107,26 @@ def process(filename: str, content: bytes, config: Settings) -> Document:
     upload_dir.mkdir(parents=True, exist_ok=True)
     path = upload_dir / f"{document_id}{Path(filename).suffix.lower()}"
     path.write_bytes(content)
+    used_ocr = False
     if config.converter == "docling":
         conversion_path = apply_ocr(path) if metrics["needs_ocr"] else path
+        used_ocr = metrics["needs_ocr"]
         markdown = docling_markdown(conversion_path)
+    elif config.converter == "vision-ocr" and metrics["needs_ocr"]:
+        client = vision_ocr_client or build_vision_ocr_client(config)
+        markdown = vision_ocr_markdown(
+            content,
+            client=client,
+            dpi=config.vision_ocr_dpi,
+            max_pages=config.vision_ocr_max_pages,
+        )
+        used_ocr = True
     else:
         markdown = fallback_markdown(filename, content)
     curated = add_front_matter(title, digest, markdown, metrics["needs_ocr"])
     nonempty = len(markdown.strip()) >= 40
-    score = round(0.45 * metrics["coverage"] + 0.35 * float(nonempty) + 0.20, 3)
+    effective_coverage = 1.0 if used_ocr and nonempty else metrics["coverage"]
+    score = round(0.45 * effective_coverage + 0.35 * float(nonempty) + 0.20, 3)
     return Document(
         id=document_id,
         filename=Path(filename).name,
