@@ -105,7 +105,9 @@ class OpenAIVisionOcrClient:
         return str(text).strip()
 
 
-def render_pdf_pages(content: bytes, *, dpi: int, max_pages: int) -> tuple[int, list[tuple[int, bytes]]]:
+def render_pdf_pages(
+    content: bytes, *, dpi: int, max_pages: int
+) -> tuple[int, list[tuple[int, bytes]]]:
     try:
         pdf = fitz.open(stream=content, filetype="pdf")
     except Exception as exc:
