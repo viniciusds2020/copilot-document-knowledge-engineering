@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import json
-import re
 import uuid
 from datetime import UTC, datetime
 from typing import Protocol
 
-from .groq_client import GroqError
 from .models import Document, KnowledgeItem, KnowledgePack
 
 
@@ -91,7 +89,7 @@ def render_markdown(pack: KnowledgePack) -> str:
         "# Conhecimento consolidado",
     ]
     for item in pack.knowledge_items:
-        evidence = f"{item.source_document}"
+        evidence = item.source_document
         if item.source_page:
             evidence += f", página {item.source_page}"
         lines.extend([f"## {item.topic}", item.statement, f"_Evidência: {evidence}_"])
