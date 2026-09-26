@@ -34,3 +34,24 @@ def test_process_adds_traceability(tmp_path):
 def test_rejects_fake_pdf():
     with pytest.raises(PipelineError, match="Assinatura"):
         inspect_content("fake.pdf", b"not a pdf", 0.7)
+
+
+class FakeVisionOcr:
+    def extract_page_markdown(self, *, image_png: bytes, page_number: int) -> str:
+        assert image_png.startswith(b"\x89PNG")
+        return f"# Página {page_number}\n\nTexto reconhecido por OCR visual."
+
+
+def test_process_uses_vision_ocr_for_scanned_pdf(tmp_path):
+    config = Settings(
+        data_dir=tmp_path,
+        converter="vision-ocr",
+        min_quality_score=0.7,
+        vision_ocr_model="fake-vision-model",
+    )
+
+    document = process("scan.pdf", make_pdf(""), config, vision_ocr_client=FakeVisionOcr())
+
+    assert "Texto reconhecido por OCR visual" in document.markdown
+    assert document.needs_ocr is True
+    assert document.quality_passed
