@@ -166,7 +166,9 @@ def publish_pack(pack_id: str):
         else:
             missing.append(document_id)
     if missing:
-        raise HTTPException(404, "Documentos de origem não encontrados: " + ", ".join(missing))
+        raise HTTPException(
+            404, "Documentos de origem não encontrados: " + ", ".join(missing)
+        )
 
     return write_publication(
         pack,
