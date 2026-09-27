@@ -65,6 +65,13 @@ class Repository:
                 (pack.id, pack.domain, pack.version, pack.model_dump_json()),
             )
 
+    def update_pack(self, pack: KnowledgePack):
+        with self.connect() as db:
+            db.execute(
+                "UPDATE knowledge_packs SET payload = ? WHERE id = ?",
+                (pack.model_dump_json(), pack.id),
+            )
+
     def list_packs(self) -> list[KnowledgePack]:
         with self.connect() as db:
             rows = db.execute(
