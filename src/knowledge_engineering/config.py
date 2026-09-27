@@ -22,10 +22,19 @@ class Settings(BaseSettings):
     vision_ocr_max_tokens: int = 4096
     vision_ocr_max_pages: int = 25
     vision_ocr_dpi: int = 180
+    publication_dir: Path = Path("published")
+    raw_chunk_chars: int = 1_500
+    raw_chunk_overlap: int = 150
 
     @property
     def database_path(self) -> Path:
         return self.data_dir / "knowledge.db"
+
+    @property
+    def publication_path(self) -> Path:
+        if self.publication_dir.is_absolute():
+            return self.publication_dir
+        return self.data_dir / self.publication_dir
 
 
 settings = Settings()
