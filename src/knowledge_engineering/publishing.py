@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import re
-import uuid
 from datetime import UTC, datetime
 from pathlib import Path
+import re
+import uuid
 
 from .models import Document, KnowledgePack, PublicationManifest, VectorChunk
 
