@@ -52,7 +52,9 @@ def pack() -> KnowledgePack:
 
 
 def test_builds_raw_and_curated_vector_chunks():
-    chunks = build_vector_chunks(pack(), [document()], raw_chunk_chars=120, raw_chunk_overlap=10)
+    chunks = build_vector_chunks(
+        pack(), [document()], raw_chunk_chars=120, raw_chunk_overlap=10
+    )
 
     assert {chunk.collection for chunk in chunks} == {"raw_chunks", "curated_chunks"}
     assert all(chunk.source_sha256 == "abc" for chunk in chunks)
