@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
-from pathlib import Path
 import re
 import uuid
+from datetime import UTC, datetime
+from pathlib import Path
 
 from .models import Document, KnowledgePack, PublicationManifest, VectorChunk
-
 
 PAGE_MARKER = re.compile(r"<!--\s*source_page:\s*(\d+)\s*-->")
 
