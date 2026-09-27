@@ -9,11 +9,12 @@ from .config import settings
 from .curation import create_knowledge_pack
 from .database import Repository
 from .groq_client import GroqClient, GroqError
-from .models import KnowledgePackRequest, StatusUpdate
+from .models import KnowledgePackRequest, PackStatusUpdate, StatusUpdate
 from .pipeline import PipelineError, process
+from .publishing import write_publication
 
 STATIC = Path(__file__).parent / "static"
-app = FastAPI(title="Copilot Document Knowledge Engineering", version="0.3.0")
+app = FastAPI(title="Copilot Document Knowledge Engineering", version="0.4.0")
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 repository = Repository(settings.database_path)
 
@@ -124,3 +125,55 @@ def create_pack(request: KnowledgePackRequest):
         raise HTTPException(
             409, "Já existe um pacote com este domínio e versão."
         ) from exc
+
+
+@app.patch("/api/knowledge-packs/{pack_id}/status")
+def update_pack_status(pack_id: str, update: PackStatusUpdate):
+    pack = repository.get_pack(pack_id)
+    if not pack:
+        raise HTTPException(404, "Pacote de conhecimento não encontrado.")
+    allowed = {
+        "draft": {"review", "deprecated"},
+        "review": {"draft", "approved", "deprecated"},
+        "approved": {"deprecated"},
+        "deprecated": set(),
+    }
+    if update.status not in allowed[pack.status]:
+        raise HTTPException(409, "Transição de status inválida.")
+    if update.status == "approved" and pack.conflicts_or_gaps:
+        raise HTTPException(
+            409, "Pacote contém lacunas ou conflitos; aprovação bloqueada."
+        )
+    pack.status = update.status
+    repository.update_pack(pack)
+    return pack
+
+
+@app.post("/api/knowledge-packs/{pack_id}/publish", status_code=201)
+def publish_pack(pack_id: str):
+    pack = repository.get_pack(pack_id)
+    if not pack:
+        raise HTTPException(404, "Pacote de conhecimento não encontrado.")
+    if pack.status != "approved":
+        raise HTTPException(409, "Apenas pacotes aprovados podem ser publicados.")
+
+    documents = []
+    missing = []
+    for document_id in pack.source_document_ids:
+        document = repository.get(document_id)
+        if document:
+            documents.append(document)
+        else:
+            missing.append(document_id)
+    if missing:
+        raise HTTPException(
+            404, "Documentos de origem não encontrados: " + ", ".join(missing)
+        )
+
+    return write_publication(
+        pack,
+        documents,
+        export_root=settings.publication_path,
+        raw_chunk_chars=settings.raw_chunk_chars,
+        raw_chunk_overlap=settings.raw_chunk_overlap,
+    )

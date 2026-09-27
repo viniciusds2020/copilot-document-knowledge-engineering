@@ -4,7 +4,7 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-Pipeline governado para transformar documentos corporativos em conhecimento rastreável para agentes do Microsoft Copilot Studio. A versão 0.3 inclui OCR por visão com modelos multimodais, além da curadoria e consolidação semântica via Groq, mantendo cada regra vinculada ao documento, hash e página de evidência.
+Pipeline governado para transformar documentos corporativos em conhecimento rastreável para agentes do Microsoft Copilot Studio. A versão 0.4 inclui publicação versionada e chunks prontos para vetorização, além de OCR por visão com modelos multimodais e curadoria semântica via Groq, mantendo cada regra vinculada ao documento, hash e página de evidência.
 
 ## O que a solução entrega
 
@@ -16,6 +16,7 @@ Pipeline governado para transformar documentos corporativos em conhecimento rast
 - workflow `draft → review → approved/deprecated`;
 - geração de pacotes de conhecimento consolidados com Groq;
 - JSON estruturado e Markdown pronto para publicação no SharePoint/Copilot Studio;
+- exportação versionada com `manifest.json`, `knowledge_pack.md`, `knowledge_pack.json` e `vector_chunks.jsonl`;
 - detecção de documentos duplicados por SHA-256;
 - dataset dourado e avaliação determinística de respostas.
 
@@ -92,6 +93,8 @@ O projeto envia apenas o Markdown de documentos aprovados e limita cada fonte a 
 | `POST` | `/api/knowledge-packs` | Consolida documentos aprovados usando Groq |
 | `GET` | `/api/knowledge-packs` | Lista pacotes consolidados |
 | `GET` | `/api/knowledge-packs/{id}` | Retorna Markdown e JSON rastreáveis |
+| `PATCH` | `/api/knowledge-packs/{id}/status` | Aprova ou deprecia um pacote consolidado |
+| `POST` | `/api/knowledge-packs/{id}/publish` | Gera pacote versionado e chunks para vetorização |
 | `GET` | `/api/health` | Saúde, conversor e configuração Groq/OCR visual |
 
 Exemplo de criação de pacote:
@@ -113,12 +116,33 @@ Exemplo de criação de pacote:
 5. Use `copilot/prompts/answer_with_sources.md` em um tópico de resposta generativa.
 6. Teste com `copilot/evaluation/golden_dataset.json` antes da promoção.
 
-## Vetorização futura
+## Publicação e vetorização
 
-Mantenha duas coleções:
+Depois de criar, revisar e aprovar um pacote, publique a versão governada:
 
-- `raw_chunks`: trechos do Markdown original, com hash e página;
-- `curated_chunks`: regras e FAQs consolidadas pelo Groq, também com as mesmas evidências.
+```bash
+curl -X PATCH http://localhost:8000/api/knowledge-packs/{id}/status \
+  -H "Content-Type: application/json" \
+  -d '{"status":"review"}'
+
+curl -X PATCH http://localhost:8000/api/knowledge-packs/{id}/status \
+  -H "Content-Type: application/json" \
+  -d '{"status":"approved"}'
+
+curl -X POST http://localhost:8000/api/knowledge-packs/{id}/publish
+```
+
+A publicação grava os artefatos em `data/published/{dominio}/{versao}/`:
+
+- `knowledge_pack.md`: base consolidada para SharePoint/Copilot Studio;
+- `knowledge_pack.json`: pacote rastreável completo;
+- `vector_chunks.jsonl`: linhas prontas para embeddings;
+- `manifest.json`: inventário da publicação.
+
+O arquivo `vector_chunks.jsonl` contém duas coleções lógicas:
+
+- `curated_chunks`: regras e FAQs consolidadas pelo Groq;
+- `raw_chunks`: trechos do Markdown original, com hash e página.
 
 Assim o chatbot responde rapidamente com conhecimento curado e ainda recupera a fonte original em casos de auditoria, conflito ou detalhamento.
 
@@ -130,11 +154,13 @@ Assim o chatbot responde rapidamente com conhecimento curado e ainda recupera a 
 - aprovação exige quality gate aprovado;
 - pacotes só aceitam documentos aprovados;
 - OCR visual preserva páginas, mas deve passar por revisão humana antes de virar base oficial;
+- publicação é bloqueada até que o pacote esteja aprovado;
 - instruções proíbem invenção de fontes e vazamento de conteúdo;
 - arquivos em `data/` são ignorados pelo Git e devem usar armazenamento seguro em produção.
 
 ## Roadmap
 
+- conectores de publicação para SharePoint, Databricks Volumes ou armazenamento de objetos;
 - suporte a DeepSeek OCR ou provedores dedicados com adaptadores nativos quando necessário;
 - publicação automatizada no SharePoint via Graph API ou Power Automate;
 - processamento em lote e atualização incremental por domínio;
