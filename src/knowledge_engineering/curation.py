@@ -150,7 +150,17 @@ Document summaries: {json.dumps(source_summaries, ensure_ascii=False)}
 Candidate facts: {json.dumps(candidate_items, ensure_ascii=False)}"""
     payload = client.complete_json(system=SYSTEM_PROMPT, user=consolidation_request)
 
+    # Never trust citations or provenance echoed by the LLM.
+    allowed = {(item.source_document_id, item.source_document,
+                item.source_sha256, item.source_page, item.statement)
+               for _, items, _ in extracted for item in items}
     items = [KnowledgeItem.model_validate(item) for item in payload.get("knowledge_items", [])]
+    for item in items:
+        reference = (item.source_document_id, item.source_document,
+                     item.source_sha256, item.source_page, item.statement)
+        if reference not in allowed:
+            raise ValueError("Invalid source reference or unsupported consolidated evidence.")
+
     warnings = [warning for _, _, values in extracted for warning in values]
     pack = KnowledgePack(
         id=uuid.uuid4().hex[:12],
